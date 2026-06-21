@@ -30,6 +30,18 @@ def vader_label(text: str) -> tuple[str, float]:
     return "neutral", score
 
 
+def textblob_label(text: str) -> tuple[str, float]:
+    """TextBlob polarity (Lab 1/5): polarity in [-1, 1]."""
+    from textblob import TextBlob
+
+    polarity = TextBlob(text or "").sentiment.polarity
+    if polarity > 0:
+        return "positive", polarity
+    if polarity < 0:
+        return "negative", polarity
+    return "neutral", polarity
+
+
 @lru_cache(maxsize=1)
 def _transformer():
     from transformers import pipeline
@@ -51,13 +63,17 @@ def add_sentiment(
         pairs = [vader_label(t) for t in texts]
         df["sentiment"] = [p[0] for p in pairs]
         df["sentiment_score"] = [p[1] for p in pairs]
+    elif method == "textblob":
+        pairs = [textblob_label(t) for t in texts]
+        df["sentiment"] = [p[0] for p in pairs]
+        df["sentiment_score"] = [p[1] for p in pairs]
     elif method == "transformer":
         clf = _transformer()
         preds = clf(texts, batch_size=32)
         df["sentiment"] = [p["label"].lower() for p in preds]
         df["sentiment_score"] = [p["score"] for p in preds]
     else:
-        raise ValueError("method must be 'vader' or 'transformer'")
+        raise ValueError("method must be 'vader', 'textblob', or 'transformer'")
     return df
 
 

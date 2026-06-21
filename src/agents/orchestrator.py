@@ -48,7 +48,10 @@ def build_agent():
     builder.add_conditional_edges(
         "chatbot", tools_condition, {"tools": "tools", "__end__": END}
     )
-    builder.add_edge("tools", "chatbot")  # loop back to answer (ReAct)
+    # Each tool already returns a complete grounded answer, so end here instead
+    # of looping back to the model. Small models (llama3.2:3b) are unreliable at
+    # the second tool-calling turn, so we avoid it.
+    builder.add_edge("tools", END)
     return builder.compile()
 
 

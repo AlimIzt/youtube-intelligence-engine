@@ -13,6 +13,8 @@ symspellpy
 
 # --- analysis ---
 spacy
+nltk
+textblob
 keybert
 yake
 vaderSentiment
@@ -20,15 +22,24 @@ transformers
 torch
 bertopic
 scikit-learn
+scipy
+
+# NOTE: pyABSA (Lab 5 Part 2, aspect-based sentiment) pins transformers==4.29
+# which conflicts with transformers 5.x above. Install it in a SEPARATE env, as
+# the lab did:  pip install transformers==4.29.0 pyabsa   (see src/analysis/absa.py)
 
 # --- RAG / LLM / agents ---
 langchain
 langchain-core
 langchain-community
+langchain-experimental
+langchain-text-splitters
 langchain-ollama
 langchain-chroma
 chromadb
 rank-bm25
+tiktoken
+sentence-transformers
 langgraph
 pydantic
 

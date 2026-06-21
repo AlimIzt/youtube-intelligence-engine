@@ -8,7 +8,7 @@ from __future__ import annotations
 import pandas as pd
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
-from langchain.retrievers import EnsembleRetriever
+from langchain_classic.retrievers import EnsembleRetriever
 
 from config import settings
 from src.rag.representation import df_to_documents
@@ -19,6 +19,18 @@ def semantic_retriever(k: int | None = None):
     """Dense vector similarity over Chroma."""
     k = k or settings.top_k
     return load_vectorstore().as_retriever(search_kwargs={"k": k})
+
+
+def mmr_retriever(k: int | None = None, fetch_k: int = 20, lambda_mult: float = 0.5):
+    """Maximal Marginal Relevance: balances relevance with diversity (W8L7).
+
+    Avoids returning many near-duplicate comments (which are common on YouTube).
+    """
+    k = k or settings.top_k
+    return load_vectorstore().as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": k, "fetch_k": fetch_k, "lambda_mult": lambda_mult},
+    )
 
 
 def lexical_retriever(df: pd.DataFrame, k: int | None = None) -> BM25Retriever:
@@ -58,6 +70,8 @@ def get_retriever(strategy: str, df: pd.DataFrame | None = None, **kwargs):
     """Factory used by the agent/generation layer."""
     if strategy == "semantic":
         return semantic_retriever(**kwargs)
+    if strategy == "mmr":
+        return mmr_retriever(**kwargs)
     if strategy == "lexical":
         if df is None:
             raise ValueError("lexical retrieval needs the dataframe")

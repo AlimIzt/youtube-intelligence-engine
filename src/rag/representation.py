@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+import numpy as np
 import pandas as pd
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
@@ -22,9 +23,12 @@ def get_embeddings() -> OllamaEmbeddings:
 
 
 def _join(values) -> str:
-    if isinstance(values, (list, tuple)):
+    # parquet round-trips list columns as numpy arrays, so handle those too
+    if isinstance(values, (list, tuple, np.ndarray)):
         return ", ".join(map(str, values))
-    return str(values) if pd.notna(values) else ""
+    if values is None or (pd.api.types.is_scalar(values) and pd.isna(values)):
+        return ""
+    return str(values)
 
 
 def df_to_documents(df: pd.DataFrame, text_col: str = "text") -> list[Document]:

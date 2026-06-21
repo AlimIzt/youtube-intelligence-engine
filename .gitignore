@@ -1,0 +1,27 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# data artifacts: commit the source dataset, ignore generated/processed files
+data/raw/*.csv
+!data/raw/comments.csv
+data/processed/*
+!data/**/.gitkeep
+
+# vector store
+chroma_db/
+*.sqlite3
+
+# mlflow
+mlflow.db
+mlruns/
+
+# misc
+.ipynb_checkpoints/
+.DS_Store

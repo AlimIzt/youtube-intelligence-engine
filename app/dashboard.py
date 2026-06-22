@@ -18,7 +18,7 @@ import streamlit as st
 from config import settings
 
 st.set_page_config(page_title="YouTube Intelligence Engine", layout="wide")
-st.title("🎬 YouTube Intelligence Engine")
+st.title("YouTube Intelligence Engine")
 
 
 # ----------------------------------------------------------------------------
@@ -125,7 +125,9 @@ if df.empty:
     st.warning("No data yet. Run the pipeline scripts (02–04) first.")
     st.stop()
 
-tab_overview, tab_insights, tab_chat = st.tabs(["Overview", "Insights", "Ask the Agent"])
+tab_overview, tab_insights, tab_chat, tab_rag = st.tabs(
+    ["Overview", "Insights", "Ask the Agent", "RAG Lab (W8L7)"]
+)
 
 # ----------------------------------------------------------------------------
 with tab_overview:
@@ -181,7 +183,7 @@ with tab_insights:
                             width="stretch")
 
     # --- word cloud + word frequency ---
-    st.subheader("Word cloud & frequency (Lab 1/5)")
+    st.subheader("Word cloud & frequency (Lab 1/5)del")
     col5, col6 = st.columns([2, 1])
     with col5:
         st.image(wordcloud_png(n), width="stretch")
@@ -189,7 +191,7 @@ with tab_insights:
         st.dataframe(word_freq(n, 20), width="stretch", hide_index=True)
 
     # --- collocations + n-grams ---
-    st.subheader("Collocations & n-grams (Lab 1)")
+    st.subheader("Collocations & n-grams (Lab 1)del")
     col7, col8, col9 = st.columns(3)
     with col7:
         st.caption("PMI bigrams")
@@ -202,12 +204,12 @@ with tab_insights:
         st.dataframe(ngrams(n, 2, 15), width="stretch", hide_index=True)
 
     # --- POS distribution ---
-    st.subheader("Part-of-speech distribution (Lab 2)")
+    st.subheader("Part-of-speech distribution (Lab 2)del")
     st.plotly_chart(px.bar(pos_distribution(n), x="POS", y="count"),
                     width="stretch")
 
     # --- relations + knowledge graph ---
-    st.subheader("Noun-Verb-Noun relations & knowledge graph (Lab 2)")
+    st.subheader("Noun-Verb-Noun relations & knowledge graph (Lab 2)del")
     col10, col11 = st.columns([1, 2])
     with col10:
         rels = relations(n)
@@ -224,7 +226,16 @@ with tab_chat:
     st.caption("RAG grounded in the comments (needs Ollama running).")
 
     c1, c2 = st.columns(2)
-    mode = c1.radio("Agent", ["Tool-calling (single)", "Multi-agent (router)"])
+    mode = c1.radio(
+        "Agent",
+        [
+            "Tool-calling (single)",
+            "Multi-agent (router)",
+            "Supervisor (full report)",
+            "Swarm (reflection)",
+            "DSPy (Chain-of-Thought)",
+        ],
+    )
     retrieval = c2.radio("Retrieval", ["semantic", "mmr"], horizontal=True)
     rerank = st.checkbox("Cross-encoder rerank (W8L7)", value=False)
 
@@ -238,6 +249,22 @@ with tab_chat:
                     cat, resp = ask_multi(q)
                     st.info(f"Routed to: **{cat}**")
                     st.write(resp)
+                elif mode.startswith("Supervisor"):
+                    from src.agents.supervisor import generate_report
+
+                    st.write(generate_report(q))
+                elif mode.startswith("Swarm"):
+                    from src.agents.swarm import ask_swarm
+
+                    st.write(ask_swarm(q))
+                elif mode.startswith("DSPy"):
+                    from src.rag.dspy_qa import answer_question_dspy
+
+                    r = answer_question_dspy(q)
+                    st.write(r.answer)
+                    st.caption(f"Self-rated confidence: {r.confidence}")
+                    with st.expander("Reasoning (Chain-of-Thought)"):
+                        st.write(getattr(r, "reasoning", ""))
                 else:
                     from src.rag.generation import answer_question
                     from src.rag.retrieval import mmr_retriever, semantic_retriever
@@ -257,3 +284,87 @@ with tab_chat:
                         st.write(answer_question(q, retriever=retr))
             except Exception as e:
                 st.error(f"Agent error: {e}")
+
+# ----------------------------------------------------------------------------
+with tab_rag:
+    st.subheader("RAG components (W8L7)")
+    st.caption("Chunking strategies, retrieval comparison, and reranking.")
+
+    # --- 1. Chunking strategies ---
+    st.markdown("### 1 · Chunking strategies")
+    join_n = st.slider("Comments to join into one document", 5, 100, 20, step=5)
+    strategy = st.radio(
+        "Strategy", ["recursive", "token", "semantic"], horizontal=True
+    )
+    if st.button("Chunk"):
+        with st.spinner("Chunking ..."):
+            try:
+                from src.rag import chunking
+
+                doc = "\n".join(sample_texts(join_n))
+                fn = {
+                    "recursive": chunking.recursive_chunks,
+                    "token": chunking.token_chunks,
+                    "semantic": chunking.semantic_chunks,
+                }[strategy]
+                chunks = fn(doc)
+                st.success(f"{strategy} → {len(chunks)} chunks")
+                for i, c in enumerate(chunks[:8]):
+                    st.text(f"[chunk {i}] {c[:200]}")
+            except Exception as e:
+                st.error(f"Chunking error: {e}")
+
+    st.divider()
+
+    # --- 2. Retrieval strategy comparison ---
+    st.markdown("### 2 · Retrieval strategy comparison")
+    rq = st.text_input("Query", "graphics look amazing", key="rag_query")
+    if st.button("Compare retrieval"):
+        with st.spinner("Retrieving ..."):
+            try:
+                from src.rag.retrieval import (
+                    hybrid_retriever,
+                    lexical_retriever,
+                    mmr_retriever,
+                    semantic_retriever,
+                )
+
+                strategies = {
+                    "Semantic": semantic_retriever(k=4),
+                    "Lexical (BM25)": lexical_retriever(df, k=4),
+                    "Hybrid": hybrid_retriever(df, k=4),
+                    "MMR": mmr_retriever(k=4),
+                }
+                cols = st.columns(len(strategies))
+                for col, (name, retr) in zip(cols, strategies.items()):
+                    with col:
+                        st.caption(name)
+                        for d in retr.invoke(rq):
+                            st.text(f"• {d.page_content[:80]}")
+            except Exception as e:
+                st.error(f"Retrieval error: {e}")
+
+    st.divider()
+
+    # --- 3. Cross-encoder reranking ---
+    st.markdown("### 3 · Cross-encoder reranking")
+    rrq = st.text_input("Query", "is the game realistic", key="rerank_query")
+    if st.button("Rerank"):
+        with st.spinner("Reranking ..."):
+            try:
+                from src.rag.postretrieval import rerank
+                from src.rag.retrieval import semantic_retriever
+
+                docs = semantic_retriever(k=10).invoke(rrq)
+                reranked = rerank(rrq, docs, top_k=5)
+                c_before, c_after = st.columns(2)
+                with c_before:
+                    st.caption("Before (semantic top 5)")
+                    for d in docs[:5]:
+                        st.text(f"• {d.page_content[:80]}")
+                with c_after:
+                    st.caption("After (cross-encoder top 5)")
+                    for d in reranked:
+                        st.text(f"• {d.page_content[:80]}")
+            except Exception as e:
+                st.error(f"Rerank error: {e}")

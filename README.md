@@ -78,7 +78,11 @@ python scripts/06_nlp_methods_demo.py # runs every lab method on the comments
 | W8L7 | Chunking: recursive / token / semantic | `rag/chunking.py` |
 | W8L7 | MMR retrieval (diversity) | `rag/retrieval.py` |
 | W8L7 | Cross-encoder reranking | `rag/postretrieval.py` |
-| 8 | Multi-agent classifier → router → specialist | `agents/multi_agent.py` |
+| 6 | DSPy Chain-of-Thought QA (signature + module) | `rag/dspy_qa.py` |
+| 8 | Tool-calling agent | `agents/orchestrator.py` |
+| 8 | Router: classifier → specialist | `agents/multi_agent.py` |
+| 8 | Supervisor: sequenced specialists → report | `agents/supervisor.py` |
+| 8 | Swarm: researcher ↔ reviewer handoff | `agents/swarm.py` |
 
 > pyABSA pins `transformers==4.29`, so run it in its own venv (see the header of
 > `src/analysis/absa.py`) — exactly as the lab used `pyabsa_env`.
@@ -86,8 +90,9 @@ python scripts/06_nlp_methods_demo.py # runs every lab method on the comments
 The **Insights** dashboard tab visualises most of these (sentiment, topics, NER,
 keywords, word cloud, collocations, n-grams, POS distribution, and a
 Noun-Verb-Noun knowledge graph). The **Ask the Agent** tab lets you switch
-between the tool-calling and multi-agent orchestrators, pick semantic vs MMR
-retrieval, and toggle cross-encoder reranking.
+between the four Lab 8 orchestrators (tool-calling, router, supervisor, swarm)
+plus the Lab 6 DSPy Chain-of-Thought module, pick semantic vs MMR retrieval, and
+toggle cross-encoder reranking.
 
 ### Monitoring (MLflow)
 ```bash

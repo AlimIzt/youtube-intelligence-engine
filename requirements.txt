@@ -41,6 +41,7 @@ rank-bm25
 tiktoken
 sentence-transformers
 langgraph
+dspy
 pydantic
 
 # --- evaluation / monitoring ---

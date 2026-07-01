@@ -5,3 +5,11 @@ runOnSave = true
 
 [browser]
 gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#818cf8"
+backgroundColor = "#060609"
+secondaryBackgroundColor = "#101018"
+textColor = "#e2e8f0"
+font = "sans serif"

@@ -21,6 +21,7 @@ vaderSentiment
 transformers
 torch
 bertopic
+gliner
 scikit-learn
 scipy
 

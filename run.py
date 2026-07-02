@@ -5,7 +5,7 @@ Prepares everything the app needs, then starts the dashboard:
   2. downloads NLTK corpora
   3. runs the pipeline (preprocess -> enrich -> build index) if data is missing
   4. (optional) starts the MLflow UI on http://localhost:5001
-  5. starts the Streamlit dashboard on http://localhost:5000
+  5. starts the Streamlit dashboard on http://localhost:5002
 
 Usage:
   python run.py                 # start the app (build data only if missing)
@@ -30,6 +30,9 @@ from config import settings
 
 REQUIRED_MODELS = (settings.llm_model, settings.embed_model)
 
+DASHBOARD_PORT = "5002"
+MLFLOW_PORT = "5001"
+
 
 def step(msg: str) -> None:
     print(f"\n\033[1m==> {msg}\033[0m", flush=True)
@@ -38,22 +41,15 @@ def step(msg: str) -> None:
 # ---------------------------------------------------------------- Ollama
 def check_ollama() -> None:
     step("Checking Ollama")
-    import time
-
-    installed = None
-    for attempt in range(15):  # wait up to ~30s for a just-started server
-        try:
-            with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3) as r:
-                installed = {m["name"] for m in __import__("json").load(r).get("models", [])}
-            break
-        except Exception:
-            if attempt == 0:
-                print("  Waiting for Ollama to start ...")
-            time.sleep(2)
-    if installed is None:
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5) as r:
+            installed = {m["name"] for m in __import__("json").load(r).get("models", [])}
+    except Exception:
         print("  ! Ollama is not reachable on :11434. Start it with `ollama serve`.")
         return
+
     print(f"  Ollama is up ({len(installed)} models installed).")
+
     for model in REQUIRED_MODELS:
         if model not in installed and f"{model}:latest" not in installed:
             print(f"  Pulling missing model: {model}")
@@ -75,11 +71,13 @@ def ensure_pipeline(rebuild: bool) -> None:
         from src.preprocessing.clean import main as preprocess
 
         preprocess()
+
     if rebuild or not settings.enriched_parquet.exists():
         step("Enriching (NER, keywords, sentiment, topics)")
         from src.pipeline import run as enrich
 
         enrich()
+
     if rebuild or not settings.chroma_dir.exists():
         step("Building vector index")
         import pandas as pd
@@ -88,21 +86,40 @@ def ensure_pipeline(rebuild: bool) -> None:
         from src.rag.vectorstore import build_vectorstore
 
         build_vectorstore(df_to_documents(pd.read_parquet(settings.enriched_parquet)))
+
     print("\n  Data + index are ready.")
 
 
 # ---------------------------------------------------------------- services
 def start_mlflow():
-    step("Starting MLflow UI -> http://localhost:5001")
+    step(f"Starting MLflow UI -> http://localhost:{MLFLOW_PORT}")
     return subprocess.Popen(
-        [sys.executable, "-m", "mlflow", "ui",
-         "--backend-store-uri", settings.mlflow_uri, "--port", "5001"]
+        [
+            sys.executable,
+            "-m",
+            "mlflow",
+            "ui",
+            "--backend-store-uri",
+            settings.mlflow_uri,
+            "--port",
+            MLFLOW_PORT,
+        ]
     )
 
 
 def start_dashboard() -> None:
-    step("Starting dashboard -> http://localhost:5000  (Ctrl+C to stop)")
-    subprocess.run([sys.executable, "-m", "streamlit", "run", "app/dashboard.py"])
+    step(f"Starting dashboard -> http://localhost:{DASHBOARD_PORT}  (Ctrl+C to stop)")
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            "app/dashboard.py",
+            "--server.port",
+            DASHBOARD_PORT,
+        ]
+    )
 
 
 def main() -> None:
@@ -117,6 +134,7 @@ def main() -> None:
     ensure_pipeline(args.rebuild)
 
     mlflow_proc = start_mlflow() if args.mlflow else None
+
     try:
         if not args.no_dashboard:
             start_dashboard()

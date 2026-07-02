@@ -13,7 +13,7 @@ YouTube API → clean → enrich (NER, keywords, sentiment, topics) → index �
 ## Quick setup
 
 **1. Prerequisites**
-- **Required:** Python 3.10+
+- **Required:** Python 3.10/3.11
 - **Optional** — only for the *Ask the Agent* / RAG tabs (LLM features).
   The analytics tabs work without it. [Ollama](https://ollama.com) running,
   with the models pulled:
@@ -119,10 +119,20 @@ data/raw/            scraped comments.csv
 data/processed/      cleaned + enriched data
 src/scraping/        YouTube collection
 src/preprocessing/   cleaning + spell correction
-src/analysis/        NER, keywords, sentiment, topics
-src/rag/             representation, vectorstore, retrieval, generation
-src/agents/          tools + LangGraph orchestrator
+src/analysis/        NER, GLiNER, keywords, sentiment, emotions, topics
+src/rag/             representation, vectorstore, retrieval, HyDE, generation
+src/agents/          tools + LangGraph orchestrator/router/supervisor/swarm
 src/evaluation/      MLflow evaluation
-app/dashboard.py     Streamlit UI (port 5000)
+app/dashboard.py     Streamlit entry point (port 5000)
+app/theme.py         global CSS, animated hero, explain/takeaway/style helpers
+app/data.py          data loading, sidebar sample scope, cached analytics
+app/tabs/            one module per dashboard tab (render(scope) each)
 scripts/             numbered pipeline entrypoints
 ```
+
+Adding a dashboard tab: create `app/tabs/<name>.py` with a
+`render(scope: Scope)` function and append it to `TABS` in
+`app/tabs/__init__.py`. Everything computed over comments should go through a
+cached `(n, strategy)` function in `app/data.py` so it respects the sidebar
+sample scope.
+

@@ -66,25 +66,6 @@ def metadata_retriever(filters: dict, k: int | None = None):
     )
 
 
-def get_retriever(strategy: str, df: pd.DataFrame | None = None, **kwargs):
-    """Factory used by the agent/generation layer."""
-    if strategy == "semantic":
-        return semantic_retriever(**kwargs)
-    if strategy == "mmr":
-        return mmr_retriever(**kwargs)
-    if strategy == "lexical":
-        if df is None:
-            raise ValueError("lexical retrieval needs the dataframe")
-        return lexical_retriever(df, **kwargs)
-    if strategy == "hybrid":
-        if df is None:
-            raise ValueError("hybrid retrieval needs the dataframe")
-        return hybrid_retriever(df, **kwargs)
-    if strategy == "metadata":
-        return metadata_retriever(**kwargs)
-    raise ValueError(f"unknown strategy: {strategy}")
-
-
 def format_docs(docs: list[Document]) -> str:
     return "\n\n".join(
         f"[{i+1}] ({d.metadata.get('sentiment','?')}, "

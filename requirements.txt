@@ -15,7 +15,6 @@ symspellpy
 spacy
 nltk
 textblob
-keybert
 yake
 vaderSentiment
 transformers

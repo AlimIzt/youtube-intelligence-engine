@@ -1,7 +1,6 @@
 """Named Entity Recognition with spaCy (Lab 2 style, batched)."""
 from __future__ import annotations
 
-from collections import Counter
 from functools import lru_cache
 
 import pandas as pd
@@ -41,10 +40,3 @@ def add_entities(df: pd.DataFrame, text_col: str = "text") -> pd.DataFrame:
     df["entities"] = [[t for t, _ in row] for row in ents]
     df["entity_labels"] = [[f"{t}:{l}" for t, l in row] for row in ents]
     return df
-
-
-def top_entities(df: pd.DataFrame, n: int = 25) -> pd.DataFrame:
-    counter: Counter = Counter()
-    for row in df["entities"]:
-        counter.update(row)
-    return pd.DataFrame(counter.most_common(n), columns=["entity", "count"])

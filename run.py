@@ -38,10 +38,19 @@ def step(msg: str) -> None:
 # ---------------------------------------------------------------- Ollama
 def check_ollama() -> None:
     step("Checking Ollama")
-    try:
-        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5) as r:
-            installed = {m["name"] for m in __import__("json").load(r).get("models", [])}
-    except Exception:
+    import time
+
+    installed = None
+    for attempt in range(15):  # wait up to ~30s for a just-started server
+        try:
+            with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3) as r:
+                installed = {m["name"] for m in __import__("json").load(r).get("models", [])}
+            break
+        except Exception:
+            if attempt == 0:
+                print("  Waiting for Ollama to start ...")
+            time.sleep(2)
+    if installed is None:
         print("  ! Ollama is not reachable on :11434. Start it with `ollama serve`.")
         return
     print(f"  Ollama is up ({len(installed)} models installed).")

@@ -11,9 +11,6 @@ import pandas as pd
 
 from config import settings
 
-LABELS = ("negative", "neutral", "positive")
-
-
 @lru_cache(maxsize=1)
 def _vader():
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -75,7 +72,3 @@ def add_sentiment(
     else:
         raise ValueError("method must be 'vader', 'textblob', or 'transformer'")
     return df
-
-
-def sentiment_distribution(df: pd.DataFrame) -> pd.Series:
-    return df["sentiment"].value_counts(normalize=True).reindex(LABELS).fillna(0)

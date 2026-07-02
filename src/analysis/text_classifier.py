@@ -7,7 +7,6 @@ Lab 5 supervised-learning workflow. Train it on any labeled review dataset
 """
 from __future__ import annotations
 
-import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
@@ -52,15 +51,3 @@ def train(
     model.fit(X_train, y_train)
     report = classification_report(y_test, model.predict(X_test))
     return model, report
-
-
-def train_from_tsv(path: str, text_col: str = 0, label_col: str = 1, tune: bool = False):
-    """Train from a TSV like Lab 5's Restaurant_Reviews.tsv (text<TAB>label)."""
-    df = pd.read_csv(path, sep="\t")
-    texts = df.iloc[:, text_col].astype(str).tolist()
-    labels = df.iloc[:, label_col].tolist()
-    return train(texts, labels, tune=tune)
-
-
-def predict(model, texts: list[str]) -> list:
-    return list(model.predict(texts))

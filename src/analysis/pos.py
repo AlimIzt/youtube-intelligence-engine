@@ -80,8 +80,3 @@ def compare_taggers(text: str) -> pd.DataFrame:
             "spaCy": spacy_tags,
         }
     )
-
-
-def pos_tags(text: str) -> list[tuple[str, str]]:
-    """Quick (token, tag) list using spaCy — used by relation extraction."""
-    return [(t.text, t.tag_) for t in _spacy()(text)]

@@ -1,6 +1,7 @@
 @echo off
-REM One-click launcher for Windows. Sets up the venv on first run, then starts
-REM the app (data pipeline if needed + dashboard on http://localhost:5000).
+REM One-click launcher for Windows. Sets up the venv on first run, starts the
+REM Ollama server and the MLflow UI, then runs the app (data pipeline if needed
+REM + dashboard on http://localhost:5000, MLflow on http://localhost:5001).
 cd /d %~dp0
 
 if not exist .venv (
@@ -15,5 +16,12 @@ if not exist .venv (
 )
 
 set PYTHONUTF8=1
-python run.py %*
+
+REM Start the Ollama server in the background (harmless error if already running).
+echo Starting Ollama server...
+start "Ollama" /min ollama serve
+
+REM Launch the app; --mlflow also starts the MLflow UI on port 5001.
+REM run.py waits for Ollama to be ready before pulling models / building the index.
+python run.py --mlflow %*
 pause

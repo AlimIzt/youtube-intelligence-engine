@@ -13,14 +13,16 @@ YouTube API → clean → enrich (NER, keywords, sentiment, topics) → index �
 ## Quick setup
 
 **1. Prerequisites**
-- Python 3.10+
-- [Ollama](https://ollama.com) running, with the models pulled:
+- **Required:** Python 3.10+
+- **Optional** — only for the *Ask the Agent* / RAG tabs (LLM features).
+  The analytics tabs work without it. [Ollama](https://ollama.com) running,
+  with the models pulled:
   ```bash
   ollama pull llama3.2:3b
   ollama pull nomic-embed-text
   ```
-
-**2. Install**
+- or just run start.bat
+**2. Install** *(required)*
 ```bash
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # Windows PowerShell
@@ -29,33 +31,39 @@ pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
-**3. Configure**
-```bash
-copy .env.example .env              # Windows  (cp on macOS/Linux)
-```
-Add your `YOUTUBE_API_KEY` to `.env` (only needed to scrape new data — sample
-comments are already in `data/raw/comments.csv`).
+**3. Configure** — **OPTIONAL, skip this.**
+> The project runs on the bundled `data/raw/comments.csv` with sensible
+> defaults, so no `.env` is needed. Only do this if you want to scrape a
+> *different* video or use non-default Ollama models:
+> ```bash
+> copy .env.example .env            # Windows  (cp on macOS/Linux)
+> ```
+> Then add your `YOUTUBE_API_KEY` to `.env`.
 
 ---
 
 ## Run
 
 ```bash
-# pipeline (run once, in order)
+# pipeline (run once, in order) — REQUIRED before first launch
 python scripts/02_preprocess.py     # clean comments
 python scripts/03_enrich.py         # NER, keywords, sentiment, topics
-python scripts/04_build_index.py    # build Chroma vector store
+python scripts/04_build_index.py    # build Chroma vector store (needs Ollama)
 
-# dashboard  → http://localhost:5000
+# dashboard  → http://localhost:5000   (main entry point)
 streamlit run app/dashboard.py
-
-# agent (CLI, optional)
-python scripts/05_run_agent.py
 ```
 
-> To scrape fresh comments instead of using the sample: `python scripts/01_scrape.py`.
+**Optional extras:**
+```bash
+python scripts/05_run_agent.py      # optional: chat with the agent from the CLI
+python scripts/01_scrape.py         # optional: scrape fresh comments (needs API key)
+```
 
-### NLP methods
+> Note: `04_build_index.py` and the *Ask the Agent* tab need Ollama running.
+> The Overview / Insights / Words / Entities / Comments tabs do not.
+
+### NLP methods *(optional demo)*
 
 All NLP techniques are implemented in `src/` and demonstrated by one script:
 
@@ -93,7 +101,8 @@ between the four agent orchestrators (tool-calling, router, supervisor, swarm)
 plus the DSPy Chain-of-Thought module, pick semantic vs MMR retrieval, and
 toggle cross-encoder reranking.
 
-### Monitoring (MLflow)
+### Monitoring (MLflow) *(optional)*
+Only needed if you want evaluation metrics and tracing; not required to run the app.
 ```bash
 python -m src.evaluation.evaluate   # logs metrics
 mlflow ui --port 5001               # → http://localhost:5001

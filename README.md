@@ -21,12 +21,23 @@ YouTube API → clean → enrich (NER, keywords, sentiment, topics) → index �
   ollama pull llama3.2:3b
   ollama pull nomic-embed-text
   ```
-- or just run start.bat
+- Or just run `start.bat` on Windows.
+
 **2. Install** *(required)*
+
+Windows PowerShell:
 ```bash
 python -m venv .venv
-.venv\Scripts\Activate.ps1          # Windows PowerShell
-# source .venv/bin/activate         # macOS/Linux
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+```
+
+macOS / Linux:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
@@ -36,13 +47,43 @@ python -m spacy download en_core_web_sm
 > defaults, so no `.env` is needed. Only do this if you want to scrape a
 > *different* video or use non-default Ollama models:
 > ```bash
-> copy .env.example .env            # Windows  (cp on macOS/Linux)
+> copy .env.example .env            # Windows
+> cp .env.example .env              # macOS/Linux
 > ```
 > Then add your `YOUTUBE_API_KEY` to `.env`.
 
 ---
 
 ## Run
+
+### Recommended one-command launcher
+
+```bash
+python run.py
+```
+
+This prepares the data and vector index if needed, then starts the dashboard:
+
+```
+http://localhost:5002
+```
+
+On macOS, the dashboard uses port `5002` because port `5000` is often reserved
+by AirPlay Receiver.
+
+To also start MLflow:
+
+```bash
+python run.py --mlflow
+```
+
+MLflow will run on:
+
+```
+http://localhost:5001
+```
+
+### Manual pipeline run
 
 ```bash
 # pipeline (run once, in order) — REQUIRED before first launch
@@ -51,7 +92,7 @@ python scripts/03_enrich.py         # NER, keywords, sentiment, topics
 python scripts/04_build_index.py    # build Chroma vector store (needs Ollama)
 
 # dashboard  → http://localhost:5002   (main entry point)
-streamlit run app/dashboard.py
+streamlit run app/dashboard.py --server.port 5002
 ```
 
 **Optional extras:**
@@ -62,6 +103,37 @@ python scripts/01_scrape.py         # optional: scrape fresh comments (needs API
 
 > Note: `04_build_index.py` and the *Ask the Agent* tab need Ollama running.
 > The Overview / Insights / Words / Entities / Comments tabs do not.
+
+### macOS notes
+
+If `python` is not found on macOS, use:
+
+```bash
+python3
+```
+
+For example:
+
+```bash
+python3 scripts/02_preprocess.py
+python3 scripts/03_enrich.py
+python3 scripts/04_build_index.py
+```
+
+If Ollama is installed but not running, start it with:
+
+```bash
+ollama serve
+```
+
+If the dashboard does not open on `5002`, check whether another process is using
+the port or change the Streamlit port in:
+
+```
+.streamlit/config.toml
+```
+
+---
 
 ### NLP methods *(optional demo)*
 
@@ -102,12 +174,15 @@ plus the DSPy Chain-of-Thought module, pick semantic vs MMR retrieval, and
 toggle cross-encoder reranking.
 
 ### Monitoring (MLflow) *(optional)*
+
 Only needed if you want evaluation metrics and tracing; not required to run the app.
+
 ```bash
 python -m src.evaluation.evaluate   # logs metrics
 mlflow ui --port 5001               # → http://localhost:5001
 ```
-> The dashboard uses port 5002 (not 5000) because macOS reserves 5000 for
+
+> The dashboard uses port `5002` because macOS can reserve port `5000` for
 > AirPlay Receiver by default, which would otherwise conflict.
 
 ---
@@ -124,7 +199,7 @@ src/analysis/        NER, GLiNER, keywords, sentiment, emotions, topics
 src/rag/             representation, vectorstore, retrieval, HyDE, generation
 src/agents/          tools + LangGraph orchestrator/router/supervisor/swarm
 src/evaluation/      MLflow evaluation
-app/dashboard.py     Streamlit entry point (port 5000)
+app/dashboard.py     Streamlit entry point (port 5002)
 app/theme.py         global CSS, animated hero, explain/takeaway/style helpers
 app/data.py          data loading, sidebar sample scope, cached analytics
 app/tabs/            one module per dashboard tab (render(scope) each)
@@ -134,6 +209,4 @@ scripts/             numbered pipeline entrypoints
 Adding a dashboard tab: create `app/tabs/<name>.py` with a
 `render(scope: Scope)` function and append it to `TABS` in
 `app/tabs/__init__.py`. Everything computed over comments should go through a
-cached `(n, strategy)` function in `app/data.py` so it respects the sidebar
-sample scope.
-
+cached `(n, strategy)` function in `app/data.py` so it respects the sidebar sample scope.

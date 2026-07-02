@@ -15,6 +15,7 @@ def render(scope: Scope) -> None:
     strategy = scope.strategy
 
     col1, col2 = st.columns(2)
+
     if "sentiment" in df:
         with col1:
             st.subheader("Sentiment")
@@ -49,10 +50,12 @@ def render(scope: Scope) -> None:
         pick = st.selectbox("Show the most emotional comments for", emo.emotion)
         if st.button("Find comments"):
             from src.analysis.extras import top_emotion_comments
+
             st.dataframe(top_emotion_comments(texts, pick), width="stretch",
                          hide_index=True)
 
     col3, col4 = st.columns(2)
+
     with col3:
         st.subheader("Opinion vs fact (subjectivity)")
         explain("Each dot is a comment. Right = positive, left = negative, "
@@ -64,6 +67,7 @@ def render(scope: Scope) -> None:
             opacity=.45, color_discrete_sequence=["#a5b4fc"])), width="stretch")
         takeaway(f"{(sub.subjectivity > .5).mean() * 100:.0f}% of comments are "
                  "more opinion than fact.")
+
     with col4:
         st.subheader("Languages")
         explain("Automatic language detection — shows how international the "
@@ -80,8 +84,52 @@ def render(scope: Scope) -> None:
         explain("Comments were automatically grouped by subject using BERTopic — "
                 "each bar is a cluster of comments about the same thing "
                 "(topic -1 = uncategorized noise, hidden here).")
-        tc = df[df.topic != -1].topic.value_counts().head(10).reset_index()
+        topic_df = df[df.topic != -1].copy()
+        tc = topic_df.topic.value_counts().head(10).reset_index()
         tc.columns = ["topic", "count"]
+
         st.plotly_chart(style(px.bar(tc, x="topic", y="count",
                                      color_discrete_sequence=["#fb7185"])),
                         width="stretch")
+
+        if not tc.empty:
+            takeaway(f"The largest visible topic is **topic {tc.iloc[0].topic}** "
+                     f"with {tc.iloc[0]['count']} comments.")
+
+        if "sentiment" in df and not topic_df.empty:
+            st.subheader("Topics by sentiment")
+            explain("This breaks the same topic clusters down by sentiment. It "
+                    "helps show whether positive, neutral and negative comments "
+                    "are talking about the same subjects or different ones.")
+
+            top_topics = topic_df.topic.value_counts().head(8).index
+            topic_sent = (
+                topic_df[topic_df.topic.isin(top_topics)]
+                .groupby(["topic", "sentiment"])
+                .size()
+                .reset_index(name="count")
+            )
+
+            st.plotly_chart(style(px.bar(
+                topic_sent,
+                x="topic",
+                y="count",
+                color="sentiment",
+                barmode="group",
+                color_discrete_map={
+                    "positive": "#4ade80",
+                    "neutral": "#94a3b8",
+                    "negative": "#f87171",
+                },
+            )), width="stretch")
+
+            dominant = (
+                topic_sent.sort_values("count", ascending=False)
+                .head(1)
+            )
+
+            if not dominant.empty:
+                row = dominant.iloc[0]
+                takeaway(f"The strongest topic-sentiment pair is **topic "
+                         f"{row.topic}** with **{row.sentiment}** comments "
+                         f"({row['count']} comments in this sample).")

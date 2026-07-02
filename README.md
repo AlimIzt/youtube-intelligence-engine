@@ -50,7 +50,7 @@ python scripts/02_preprocess.py     # clean comments
 python scripts/03_enrich.py         # NER, keywords, sentiment, topics
 python scripts/04_build_index.py    # build Chroma vector store (needs Ollama)
 
-# dashboard  → http://localhost:5000   (main entry point)
+# dashboard  → http://localhost:5002   (main entry point)
 streamlit run app/dashboard.py
 ```
 
@@ -107,7 +107,8 @@ Only needed if you want evaluation metrics and tracing; not required to run the 
 python -m src.evaluation.evaluate   # logs metrics
 mlflow ui --port 5001               # → http://localhost:5001
 ```
-> MLflow uses `--port 5001` because the dashboard already owns port 5000.
+> The dashboard uses port 5002 (not 5000) because macOS reserves 5000 for
+> AirPlay Receiver by default, which would otherwise conflict.
 
 ---
 

@@ -11,7 +11,7 @@ monitoring. Runs fully locally on Ollama (`llama3.2:3b` + `nomic-embed-text`).
 ## How to run
 - One click (Windows): double-click **`start.bat`** (sets up venv on first run).
 - Or: `python run.py` → prepares data + index, then opens the dashboard on
-  **http://localhost:5000**. Add `--mlflow` for the MLflow UI on `:5001`.
+  **http://localhost:5002**. Add `--mlflow` for the MLflow UI on `:5001`.
 
 ## Pipeline (scripts/)
 | Step | Script | Output |
@@ -50,7 +50,7 @@ monitoring. Runs fully locally on Ollama (`llama3.2:3b` + `nomic-embed-text`).
   full report (`agents/supervisor.py`), and swarm researcher↔reviewer handoff
   (`agents/swarm.py`)
 
-## Dashboard (app/dashboard.py, port 5000)
+## Dashboard (app/dashboard.py, port 5002)
 - **Overview** — counts, % positive, sample table
 - **Insights** — sentiment, topics, NER, keywords, word cloud + frequency,
   PMI collocations, n-grams, POS distribution, Noun-Verb-Noun knowledge graph

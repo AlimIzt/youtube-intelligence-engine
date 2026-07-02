@@ -133,6 +133,36 @@ the port or change the Streamlit port in:
 .streamlit/config.toml
 ```
 
+### BERTopic note on macOS
+
+BERTopic can fail on some macOS machines during the topic modeling stage,
+especially around the UMAP / HDBSCAN dimensionality-reduction and clustering
+step. This is usually not caused by the project code itself, but by native
+Python dependencies that need local binary support, such as `hdbscan`, `numba`,
+OpenMP, or compiler tools.
+
+If topic modeling crashes with a segmentation fault or native dependency error,
+try the following fixes:
+
+```bash
+xcode-select --install
+python -m pip install --upgrade pip setuptools wheel
+pip install --force-reinstall hdbscan umap-learn numba
+```
+
+If `python` is not available on macOS, use `python3` instead:
+
+```bash
+python3 -m pip install --upgrade pip setuptools wheel
+python3 -m pip install --force-reinstall hdbscan umap-learn numba
+```
+
+The pipeline also includes a safe fallback in `src/pipeline.py`: it first tries
+to run normal BERTopic topic modeling through `add_topics(df)`. If that fails,
+it continues with `topic = -1`, meaning no topic was assigned. This fallback
+keeps cleaning, NER, keywords, sentiment, vector indexing, RAG, and the dashboard
+working instead of crashing.
+
 ---
 
 ### NLP methods *(optional demo)*
@@ -210,3 +240,7 @@ Adding a dashboard tab: create `app/tabs/<name>.py` with a
 `render(scope: Scope)` function and append it to `TABS` in
 `app/tabs/__init__.py`. Everything computed over comments should go through a
 cached `(n, strategy)` function in `app/data.py` so it respects the sidebar sample scope.
+
+---
+
+We really love Professor Farhad and Professor Asma.

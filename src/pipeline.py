@@ -7,7 +7,7 @@ from config import settings
 from src.analysis.keywords import add_keywords
 from src.analysis.ner import add_entities
 from src.analysis.sentiment import add_sentiment
-# from src.analysis.topics import add_topics  # Temporarily disabled because BERTopic crashes on Mac
+from src.analysis.topics import add_topics
 from src.preprocessing.clean import clean_dataframe
 
 
@@ -26,13 +26,14 @@ def run(spell: bool = False, sentiment_method: str = "vader") -> pd.DataFrame:
     df = add_sentiment(df, method=sentiment_method)
 
     print("5/5  topic modeling ...")
-    # Original BERTopic call:
-    # df, _model = add_topics(df)
-    #
-    # Temporary fallback:
-    # -1 means "topic not assigned".
-    # This keeps the rest of the pipeline working, especially vector index building.
-    df["topic"] = -1
+    try:
+        df, _model = add_topics(df)
+    except Exception as e:
+        # BERTopic can fail to build on some machines (e.g. hdbscan/numba
+        # native-build issues on Mac). Fall back to -1 ("not assigned") rather
+        # than aborting the whole pipeline; every downstream step tolerates it.
+        print(f"  ! Topic modeling failed ({e}); continuing with topic = -1.")
+        df["topic"] = -1
 
     # Parquet preserves list columns (entities/keywords); csv would stringify them.
     df.to_parquet(settings.enriched_parquet, index=False)

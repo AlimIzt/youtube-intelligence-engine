@@ -1,10 +1,14 @@
-"""HyDE: Hypothetical Document Embeddings (W8L7 5_Retrieval.py, adapted).
+"""HyDE retrieval utilities for the RAG pipeline.
 
-Short questions embed poorly. HyDE first asks the LLM to write a plausible
-hypothetical comment answering the question, then uses THAT richer text as the
-retrieval query — it usually lands closer to real matching comments than the
-bare question does. Reuses the project's DSPy/Ollama setup, semantic retriever,
-cross-encoder reranker, and grounded QA chain.
+HyDE stands for Hypothetical Document Embeddings. Short user questions often
+produce weak embeddings because they contain little context. This module first
+uses the local LLM to generate a plausible YouTube-style comment that could
+answer the question, then uses that richer generated text as the retrieval
+query.
+
+The retrieved documents are still real comments from the vector database. The
+hypothetical text is only used to improve the search query, not as evidence in
+the final answer.
 """
 from __future__ import annotations
 
@@ -16,20 +20,39 @@ from src.rag.dspy_qa import _configure
 
 
 class GetHyDE(dspy.Signature):
-    """Write a short, realistic YouTube comment that would answer the question.
-    Sound like a real commenter, not an analyst. 1-3 sentences."""
+    """DSPy signature for generating a hypothetical retrieval document.
+
+    Input:
+        question: A user question about the YouTube comment dataset.
+
+    Output:
+        hypothetical_answer: A short realistic comment that could answer the
+        question. This text is used as a richer semantic search query.
+    """
 
     question = dspy.InputField(desc="a question about YouTube comments on a game trailer")
     hypothetical_answer = dspy.OutputField(desc="a plausible comment answering the question")
 
 
 def hypothetical_answers(question: str, n: int = 1) -> list[str]:
-    """Generate n hypothetical comments (temperature varied for diversity)."""
+    """Generate hypothetical comments for a user question.
+
+    Args:
+        question: The user question that should be converted into a richer
+            retrieval query.
+        n: Number of hypothetical comments to generate.
+
+    Returns:
+        A list of generated YouTube-style comments. These are used only for
+        retrieval and are not treated as ground-truth evidence.
+    """
     _configure()
     outs: list[str] = []
+
     for i in range(max(n, 1)):
         pred = dspy.Predict(GetHyDE, temperature=min(0.2 + 0.4 * i, 1.0))
         outs.append(str(pred(question=question).hypothetical_answer).strip())
+
     return outs
 
 
@@ -39,33 +62,66 @@ def hyde_retrieve(
     n_hypothetical: int = 1,
     hypotheticals: list[str] | None = None,
 ) -> list[Document]:
-    """Retrieve real comments using hypothetical answer(s) as the query.
+    """Retrieve real comments using HyDE-generated query text.
 
-    With multiple hypotheticals the pooled results are deduplicated and
-    reranked against the ORIGINAL question with the existing cross-encoder.
+    The function generates one or more hypothetical comments, searches the
+    vector database with them, removes duplicate retrieved comments, and
+    optionally reranks the pooled results against the original user question.
+
+    Args:
+        question: The original user question.
+        k: Number of final documents to return. If not provided, the project
+            default from settings is used.
+        n_hypothetical: Number of hypothetical comments to generate when
+            hypotheticals are not provided.
+        hypotheticals: Optional pre-generated hypothetical comments. This is
+            useful for demos and testing.
+
+    Returns:
+        A list of retrieved LangChain Document objects containing real YouTube
+        comments from the Chroma vector store.
     """
     from src.rag.retrieval import semantic_retriever
 
     k = k or settings.top_k
     hypos = hypotheticals or hypothetical_answers(question, n_hypothetical)
     retriever = semantic_retriever(k=k)
+
     seen: set[str] = set()
     pool: list[Document] = []
+
     for h in hypos:
         for d in retriever.invoke(h):
             if d.page_content not in seen:
                 seen.add(d.page_content)
                 pool.append(d)
+
     if len(hypos) > 1:
         from src.rag.postretrieval import rerank
 
         return rerank(question, pool, top_k=k)
+
     return pool[:k]
 
 
-def hyde_answer(question: str, k: int | None = None,
-                hypotheticals: list[str] | None = None) -> str:
-    """Grounded final answer over HyDE-retrieved comments (existing QA chain)."""
+def hyde_answer(
+    question: str,
+    k: int | None = None,
+    hypotheticals: list[str] | None = None,
+) -> str:
+    """Generate a grounded answer using HyDE retrieval.
+
+    The answer is produced from real retrieved comments, not from the
+    hypothetical comment itself. The hypothetical text only improves retrieval.
+
+    Args:
+        question: User question to answer.
+        k: Number of retrieved documents to use.
+        hypotheticals: Optional pre-generated hypothetical comments.
+
+    Returns:
+        A grounded natural-language answer generated by the project QA chain.
+    """
     from langchain_core.output_parsers import StrOutputParser
 
     from src.rag.generation import QA_PROMPT, get_llm
@@ -73,16 +129,21 @@ def hyde_answer(question: str, k: int | None = None,
 
     docs = hyde_retrieve(question, k, hypotheticals=hypotheticals)
     chain = QA_PROMPT | get_llm() | StrOutputParser()
+
     return chain.invoke({"question": question, "context": format_docs(docs)})
 
 
 def main() -> None:
+    """Run a small HyDE demo from the command line."""
     q = "Do people complain about the release date?"
     hypos = hypothetical_answers(q, 2)
+
     for h in hypos:
         print(f"hypothetical: {h}")
+
     for d in hyde_retrieve(q, hypotheticals=hypos):
         print(f"retrieved: {d.page_content[:90]}")
+
     print(f"\nanswer:\n{hyde_answer(q, hypotheticals=hypos)}")
 
 

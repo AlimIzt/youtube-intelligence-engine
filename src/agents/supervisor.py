@@ -1,12 +1,9 @@
-"""Lab 8 Supervisor pattern.
+"""Lab 8 supervisor pattern for YouTube comment analysis.
 
-A supervisor decides which specialist agent runs next, sequencing them until a
-complete "comment intelligence report" is assembled, then a final agent composes
-the report. Mirrors the Lab 8 travel-planner supervisor (conditional entry point
-+ each specialist routing back through the supervisor), adapted to YouTube
-comment analysis.
-
-Flow:  sentiment -> topics -> entities -> summary -> final
+This module keeps the same supervisor workflow from Lab 8: a central
+supervisor routes the state to specialist agents, each specialist writes one
+part of the report, and control returns to the supervisor until the final
+report can be generated.
 """
 from __future__ import annotations
 
@@ -25,6 +22,17 @@ from src.rag.generation import summarize
 
 
 class ReportState(TypedDict, total=False):
+    """Shared graph state for the supervisor workflow.
+
+    Attributes:
+        request: User request or analysis topic.
+        sentiment_report: Summary produced by the sentiment specialist.
+        topic_report: Summary produced by the topic specialist.
+        entity_report: Summary produced by the entity/keyword specialist.
+        summary_report: General summary of audience opinions.
+        final_report: Final combined report produced by the final agent.
+    """
+
     request: str
     sentiment_report: str
     topic_report: str
@@ -35,17 +43,30 @@ class ReportState(TypedDict, total=False):
 
 @lru_cache(maxsize=1)
 def _llm() -> ChatOllama:
+    """Return a cached local Ollama chat model for report generation."""
     return ChatOllama(model=settings.llm_model, temperature=0)
 
 
 @lru_cache(maxsize=1)
 def _data() -> pd.DataFrame:
+    """Load and cache the enriched comments dataframe."""
     return pd.read_parquet(settings.enriched_parquet)
 
 
 # ----------------------------------------------------------------- supervisor
 def supervisor(state: ReportState) -> str:
-    """Decide which specialist runs next based on what's still missing."""
+    """Choose the next specialist based on missing report sections.
+
+    The supervisor checks the shared state in a fixed order. If a section is
+    missing, it routes execution to the specialist responsible for that section.
+    Once all specialist outputs exist, it routes to the final report agent.
+
+    Args:
+        state: Current LangGraph state.
+
+    Returns:
+        Name of the next graph node to execute.
+    """
     if not state.get("sentiment_report"):
         return "sentiment_agent"
     if not state.get("topic_report"):
@@ -59,6 +80,7 @@ def supervisor(state: ReportState) -> str:
 
 # ----------------------------------------------------------------- specialists
 def sentiment_agent(state: ReportState) -> dict:
+    """Create a sentiment distribution summary from enriched comments."""
     df = _data()
     dist = df["sentiment"].value_counts(normalize=True).mul(100).round(1)
     report = "; ".join(f"{k}: {v}%" for k, v in dist.items())
@@ -66,6 +88,7 @@ def sentiment_agent(state: ReportState) -> dict:
 
 
 def topic_agent(state: ReportState) -> dict:
+    """Create a short topic-count summary from assigned topic labels."""
     df = _data()
     counts = df[df.topic != -1]["topic"].value_counts().head(6)
     report = ", ".join(f"topic {t} ({c})" for t, c in counts.items())
@@ -73,23 +96,29 @@ def topic_agent(state: ReportState) -> dict:
 
 
 def entity_agent(state: ReportState) -> dict:
+    """Aggregate the most common entities and keywords from the dataset."""
     from collections import Counter
 
     df = _data()
     ents: Counter = Counter()
     kws: Counter = Counter()
+
     for row in df.get("entities", []):
         if row is not None:
             ents.update(map(str, row))
+
     for row in df.get("keywords", []):
         if row is not None:
             kws.update(map(str, row))
+
     top_e = ", ".join(e for e, _ in ents.most_common(10))
     top_k = ", ".join(k for k, _ in kws.most_common(10))
+
     return {"entity_report": f"Entities: {top_e}\nKeywords: {top_k}"}
 
 
 def summary_agent(state: ReportState) -> dict:
+    """Generate a general natural-language summary for the request."""
     return {"summary_report": summarize(state.get("request", "the video"))}
 
 
@@ -110,6 +139,7 @@ Notable Entities, and Takeaways."""
 
 
 def final_agent(state: ReportState) -> dict:
+    """Combine specialist outputs into the final intelligence report."""
     chain = FINAL_PROMPT | _llm() | StrOutputParser()
     return {"final_report": chain.invoke(dict(state))}
 
@@ -126,7 +156,14 @@ ROUTES = {
 
 @lru_cache(maxsize=1)
 def build_supervisor():
+    """Build and cache the LangGraph supervisor workflow.
+
+    Returns:
+        A compiled LangGraph application that routes between specialist agents
+        until the final report is produced.
+    """
     builder = StateGraph(ReportState)
+
     for name, fn in [
         ("sentiment_agent", sentiment_agent),
         ("topic_agent", topic_agent),
@@ -137,21 +174,34 @@ def build_supervisor():
         builder.add_node(name, fn)
 
     builder.set_conditional_entry_point(supervisor, ROUTES)
+
     for node in ("sentiment_agent", "topic_agent", "entity_agent", "summary_agent"):
         builder.add_conditional_edges(node, supervisor, ROUTES)
+
     builder.add_edge("final_agent", END)
+
     return builder.compile()
 
 
 def generate_report(request: str = "the video") -> str:
+    """Generate a full comment intelligence report.
+
+    Args:
+        request: Topic or user request to analyze.
+
+    Returns:
+        Final report text produced by the supervisor workflow.
+    """
     result = build_supervisor().invoke({"request": request})
     return result["final_report"]
 
 
 def main() -> None:
+    """Run the supervisor workflow with MLflow logging enabled."""
     mlflow.set_tracking_uri(settings.mlflow_uri)
     mlflow.set_experiment(settings.mlflow_experiment)
     mlflow.langchain.autolog()
+
     with mlflow.start_run(run_name="supervisor_report"):
         print(generate_report("the GTA VI trailer"))
 

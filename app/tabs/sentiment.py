@@ -4,7 +4,7 @@ from __future__ import annotations
 import plotly.express as px
 import streamlit as st
 
-from app.data import Scope, emotions, languages, subjectivity_df
+from app.data import Scope, emotions, languages, subjectivity_df, topic_labels
 from app.theme import explain, takeaway, style
 
 
@@ -83,24 +83,31 @@ def render(scope: Scope) -> None:
         st.subheader("What people talk about (topics)")
         explain("Comments were automatically grouped by subject using BERTopic — "
                 "each bar is a cluster of comments about the same thing "
-                "(topic -1 = uncategorized noise, hidden here).")
+                "(topic -1 = uncategorized noise, hidden here). Hover a bar to "
+                "see the topic's top keywords.")
         topic_df = df[df.topic != -1].copy()
+        labels = topic_labels(n, strategy)
         tc = topic_df.topic.value_counts().head(10).reset_index()
         tc.columns = ["topic", "count"]
+        tc["keywords"] = tc["topic"].map(lambda t: labels.get(int(t), ""))
 
         st.plotly_chart(style(px.bar(tc, x="topic", y="count",
+                                     hover_data={"keywords": True},
                                      color_discrete_sequence=["#fb7185"])),
                         width="stretch")
 
         if not tc.empty:
-            takeaway(f"The largest visible topic is **topic {tc.iloc[0].topic}** "
-                     f"with {tc.iloc[0]['count']} comments.")
+            top = tc.iloc[0]
+            kw = f" ({top.keywords})" if top.keywords else ""
+            takeaway(f"The largest visible topic is **topic {top.topic}**{kw} "
+                     f"with {top['count']} comments.")
 
         if "sentiment" in df and not topic_df.empty:
             st.subheader("Topics by sentiment")
             explain("This breaks the same topic clusters down by sentiment. It "
                     "helps show whether positive, neutral and negative comments "
-                    "are talking about the same subjects or different ones.")
+                    "are talking about the same subjects or different ones. Hover "
+                    "a bar to see the topic's top keywords.")
 
             top_topics = topic_df.topic.value_counts().head(8).index
             topic_sent = (
@@ -109,6 +116,8 @@ def render(scope: Scope) -> None:
                 .size()
                 .reset_index(name="count")
             )
+            topic_sent["keywords"] = topic_sent["topic"].map(
+                lambda t: labels.get(int(t), ""))
 
             st.plotly_chart(style(px.bar(
                 topic_sent,
@@ -116,6 +125,7 @@ def render(scope: Scope) -> None:
                 y="count",
                 color="sentiment",
                 barmode="group",
+                hover_data={"keywords": True},
                 color_discrete_map={
                     "positive": "#4ade80",
                     "neutral": "#94a3b8",
@@ -130,6 +140,7 @@ def render(scope: Scope) -> None:
 
             if not dominant.empty:
                 row = dominant.iloc[0]
+                kw = f" ({row.keywords})" if row.keywords else ""
                 takeaway(f"The strongest topic-sentiment pair is **topic "
-                         f"{row.topic}** with **{row.sentiment}** comments "
+                         f"{row.topic}**{kw} with **{row.sentiment}** comments "
                          f"({row['count']} comments in this sample).")

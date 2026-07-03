@@ -103,6 +103,28 @@ def list_column_counts(n: int, strategy: str, col: str, top: int) -> pd.DataFram
 
 
 @st.cache_data
+def topic_labels(n: int, strategy: str, top_words: int = 5) -> dict[int, str]:
+    """Human-readable label per topic: its most frequent comment keywords.
+
+    BERTopic assigns each comment a numeric topic id but the pipeline doesn't
+    persist the cluster's words, so we reconstruct a short label from the
+    per-comment `keywords` column (used for chart hover tooltips).
+    """
+    d = scoped(n, strategy)
+    if "topic" not in d or "keywords" not in d:
+        return {}
+    labels: dict[int, str] = {}
+    for topic, grp in d[d.topic != -1].groupby("topic"):
+        counter: Counter = Counter()
+        for row in grp["keywords"]:
+            if row is not None:
+                counter.update(str(x) for x in row)
+        top = [w for w, _ in counter.most_common(top_words)]
+        labels[int(topic)] = ", ".join(top) if top else f"topic {topic}"
+    return labels
+
+
+@st.cache_data
 def collocations(n: int, strategy: str, gram: int, top: int) -> pd.DataFrame:
     from src.analysis.collocations import pmi_collocations
     return pmi_collocations(_texts(n, strategy),

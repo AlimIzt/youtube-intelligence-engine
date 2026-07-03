@@ -246,3 +246,4 @@ cached `(n, strategy)` function in `app/data.py` so it respects the sidebar samp
 We really love Professor Farhad and Professor Asma.
 
 Tech Demo: https://youtu.be/5QNhMDZ3BTo
+Dashboard Demo: https://youtu.be/RJVfbuwjXIM
